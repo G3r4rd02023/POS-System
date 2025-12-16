@@ -1,0 +1,59 @@
+@using POS.Shared.DTOs.Stock
+@using POS.Shared.Enums
+@using POS.Frontend.Services
+@using MudBlazor
+@inject IStockService StockService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
+
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success">
+            <MudText Typo="Typo.subtitle1" Class="mb-3">Producto: <b>@ProductName</b></MudText>
+            
+            <MudRadioGroup T="MovementType" @bind-Value="model.MovementType" Class="mb-4">
+                <MudRadio Value="MovementType.Entrada" Color="Color.Success">Agregar (Entrada)</MudRadio>
+                <MudRadio Value="MovementType.Salida" Color="Color.Error">Quitar (Salida)</MudRadio>
+            </MudRadioGroup>
+
+            <MudNumericField @bind-Value="model.Quantity" Label="Cantidad" Min="1" Variant="Variant.Outlined" Required="true" RequiredError="Cantidad requerida"/>
+            
+            <MudTextField @bind-Value="model.Notes" Label="Motivo / Notas" Variant="Variant.Outlined" Lines="2" Class="mt-3"/>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!success)">Guardar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int ProductId { get; set; }
+    [Parameter] public string ProductName { get; set; } = string.Empty;
+
+    private CreateStockMovementDto model = new() { Quantity = 1, MovementType = MovementType.Entrada };
+    private MudForm form = null!;
+    private bool success;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        model.ProductId = ProductId;
+        // Mock User ID
+        model.UserId = 1; 
+
+        try
+        {
+             await StockService.AdjustStockAsync(model);
+             Snackbar.Add("Stock actualizado correctamente", Severity.Success);
+             MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Error al actualizar stock", Severity.Error);
+        }
+    }
+}

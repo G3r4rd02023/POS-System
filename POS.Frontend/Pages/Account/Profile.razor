@@ -1,0 +1,33 @@
+@page "/profile"
+
+@inject AuthService AuthService
+
+<h3>Profile</h3>
+
+@if (loading)
+{
+    <p>Loading...</p>
+}
+else if (user != null)
+{
+    <div class="mb-2"><strong>Name:</strong> @user.Name</div>
+    <div class="mb-2"><strong>Email:</strong> @user.Email</div>
+    <div class="mb-2"><strong>Username:</strong> @user.Username</div>
+    <div class="mb-2"><strong>Role:</strong> @user.Role</div>
+    <div class="mb-2"><strong>Active:</strong> @(user.IsActive ? "Yes" : "No")</div>
+}
+else
+{
+    <p>No profile available.</p>
+}
+
+@code {
+    private UserResponseDto? user;
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await AuthService.GetProfileAsync();
+        loading = false;
+    }
+}

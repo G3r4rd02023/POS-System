@@ -1,0 +1,100 @@
+@using MudBlazor
+@using POS.Shared.DTOs.CashClosing
+@using POS.Frontend.Services
+@inject ICashClosingService CashClosingService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
+
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success">
+            <MudText Typo="Typo.h6" Class="mb-3">Resumen de Turno</MudText>
+            @if (isLoading)
+            {
+               <MudProgressCircular Indeterminate="true" />
+            }
+            else
+            {
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudText Typo="Typo.subtitle2">Fecha Inicio:</MudText>
+                        <MudText>@preview?.StartDate.ToString("g")</MudText>
+                    </MudItem>
+                     <MudItem xs="6">
+                        <MudText Typo="Typo.subtitle2">Ventas Total (Sistema):</MudText>
+                        <MudText Color="Color.Primary" Typo="Typo.h6">@preview?.TotalCash.ToString("C2")</MudText>
+                    </MudItem>
+                </MudGrid>
+                
+                <MudDivider Class="my-4"/>
+
+                <MudNumericField @bind-Value="model.FinalCash" Label="Efectivo en Caja (Real)" Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" Immediate="true"/>
+                
+                <MudAlert Severity="@DifferenceSeverity" Class="mt-3">
+                    Diferencia: <b>@Difference.ToString("C2")</b>
+                </MudAlert>
+
+                <MudTextField @bind-Value="model.Notes" Label="Notas / Observaciones" Variant="Variant.Outlined" Lines="2" Class="mt-3"/>
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancelar</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Submit" Disabled="@(!success || isLoading)">Cerrar Caja</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private CreateCashClosingDto model = new();
+    private CashClosingDto? preview;
+    private MudForm form = null!;
+    private bool success;
+    private bool isLoading = true;
+
+    private decimal Difference => model.FinalCash - (preview?.TotalCash + preview?.InitialBalance ?? 0);
+    private Severity DifferenceSeverity => Difference == 0 ? Severity.Success : (Difference < 0 ? Severity.Error : Severity.Warning);
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            preview = await CashClosingService.GetPreviewAsync();
+            model.FinalCash = preview?.TotalCash ?? 0;
+            if (preview == null) 
+            {
+               Snackbar.Add("No se pudo cargar la información del corte. Verifique la conexión o el estado del servidor.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar datos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        // Mock User
+        model.UserId = 1;
+
+        var result = await CashClosingService.PerformClosingAsync(model);
+        if (result != null)
+        {
+             Snackbar.Add("Caja cerrada correctamente", Severity.Success);
+             MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+        {
+            Snackbar.Add("Error al cerrar caja", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,483 @@
+@page "/products"
+@using POS.Shared.DTOs.Product
+@using POS.Shared.DTOs.Category
+@using POS.Frontend.Services
+@using POS.Frontend.Helpers
+@inject IProductService ProductService
+@inject ICategoryService CategoryService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+@inject IDialogService DialogService
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudPaper Elevation="0" Class="pa-6">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-6">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" Color="Color.Primary" />
+                <MudText Typo="Typo.h4" Color="Color.Primary">
+                    <b>Gestión de Productos</b>
+                </MudText>
+            </MudStack>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       Size="Size.Large"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="ToggleCreate">
+                Nuevo Producto
+            </MudButton>
+        </MudStack>
+
+        <!-- Create Form -->
+        <MudCollapse Expanded="showCreate">
+            <MudPaper Elevation="4" Class="pa-4 mb-4" Style="border-left: 4px solid var(--mud-palette-primary);">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                    <MudText Typo="Typo.h6" Color="Color.Primary">
+                        <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-2" />
+                        Crear Nuevo Producto
+                    </MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                   Color="Color.Default" 
+                                   OnClick="() => showCreate = false" />
+                </MudStack>
+                
+                <MudGrid>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="createModel.Code" Label="Código" Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.QrCode" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="createModel.Name" Label="Nombre" Variant="Variant.Outlined" />
+                    </MudItem>
+                     <MudItem xs="12" sm="4">
+                         <MudSelect @bind-Value="createModel.CategoryId" Label="Categoría" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                             @foreach (var cat in Categories)
+                             {
+                                 <MudSelectItem Value="@cat.Id">@cat.Name</MudSelectItem>
+                             }
+                         </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField @bind-Value="createModel.Price" Label="Precio" Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" />
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                        <MudNumericField @bind-Value="createModel.CurrentStock" Label="Stock Actual" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                         <MudNumericField @bind-Value="createModel.StockMinimum" Label="Stock Mínimo" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="createModel.Description" Label="Descripción" Variant="Variant.Outlined" Lines="2" />
+                    </MudItem>
+
+                    <!-- Image Upload -->
+                    <MudItem xs="12">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
+                             <MudFileUpload T="IBrowserFile" FilesChanged="UploadImage">
+                                <ActivatorContent>
+                                    <MudButton HtmlTag="label"
+                                               Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.CloudUpload">
+                                        Subir Imagen
+                                    </MudButton>
+                                </ActivatorContent>
+                            </MudFileUpload>
+                            @if (!string.IsNullOrEmpty(createModel.Image))
+                            {
+                                <MudImage Src="@createModel.Image" Height="100" Class="rounded-lg"/>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="() => createModel.Image = null" />
+                            }
+                        </MudStack>
+                    </MudItem>
+
+                    <MudItem xs="12" Class="mt-2">
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Color="Color.Success" 
+                                       Variant="Variant.Filled" 
+                                       StartIcon="@Icons.Material.Filled.Save"
+                                       OnClick="HandleCreate">
+                                Crear
+                            </MudButton>
+                            <MudButton Color="Color.Default" 
+                                       Variant="Variant.Outlined" 
+                                       StartIcon="@Icons.Material.Filled.Cancel"
+                                       OnClick="() => showCreate = false">
+                                Cancelar
+                            </MudButton>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudCollapse>
+
+        <!-- Edit Form -->
+        @if (editingProduct != null)
+        {
+            <MudPaper Elevation="8" Class="pa-4 mt-4 mb-4" Style="border-left: 4px solid var(--mud-palette-info);">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                    <MudText Typo="Typo.h6" Color="Color.Info">
+                        <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" />
+                        Editar Producto - @editingProduct.Name
+                    </MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                   Color="Color.Default" 
+                                   OnClick="CancelEdit" />
+                </MudStack>
+                
+                <MudGrid>
+                     <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="editingProduct.Code" Label="Código" Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.QrCode" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="editingProduct.Name" Label="Nombre" Variant="Variant.Outlined" />
+                    </MudItem>
+                     <MudItem xs="12" sm="4">
+                         <MudSelect @bind-Value="editingProduct.CategoryId" Label="Categoría" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                             @foreach (var cat in Categories)
+                             {
+                                 <MudSelectItem Value="@cat.Id">@cat.Name</MudSelectItem>
+                             }
+                         </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField @bind-Value="editingProduct.Price" Label="Precio" Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.AttachMoney" />
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                        <MudNumericField @bind-Value="editingProduct.CurrentStock" Label="Stock Actual" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="3">
+                         <MudNumericField @bind-Value="editingProduct.StockMinimum" Label="Stock Mínimo" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="editingProduct.Description" Label="Descripción" Variant="Variant.Outlined" Lines="2" />
+                    </MudItem>
+                     <MudItem xs="12">
+                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                             <MudSwitch T="bool" @bind-Checked="editingProduct.IsActive" Color="Color.Success" Label="Activo" ThumbIcon="@(editingProduct.IsActive ? Icons.Material.Filled.Check : Icons.Material.Filled.Close)"/>
+                         </MudStack>
+                    </MudItem>
+
+                    <!-- Image Upload (Edit) -->
+                    <MudItem xs="12">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="4">
+                             <MudFileUpload T="IBrowserFile" FilesChanged="UploadImageEdit">
+                                <ActivatorContent>
+                                    <MudButton HtmlTag="label"
+                                               Variant="Variant.Filled"
+                                               Color="Color.Info"
+                                               StartIcon="@Icons.Material.Filled.CloudUpload">
+                                        Cambiar Imagen
+                                    </MudButton>
+                                </ActivatorContent>
+                            </MudFileUpload>
+                             @if (!string.IsNullOrEmpty(newImageBase64))
+                            {
+                                <MudImage Src="@newImageBase64" Height="100" Class="rounded-lg border-2 mud-border-info"/>
+                                <MudText Typo="Typo.caption">Nueva Imagen</MudText>
+                            }
+                            else if (!string.IsNullOrEmpty(editingProduct.ImageUrl))
+                            {
+                                <MudImage Src="@editingProduct.ImageUrl" Height="100" Class="rounded-lg"/>
+                                <MudText Typo="Typo.caption">Imagen Actual</MudText>
+                            }
+                        </MudStack>
+                    </MudItem>
+
+                    <MudItem xs="12" Class="mt-2">
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Color="Color.Info" 
+                                       Variant="Variant.Filled" 
+                                       StartIcon="@Icons.Material.Filled.Save"
+                                       OnClick="HandleUpdate">
+                                Guardar Cambios
+                            </MudButton>
+                            <MudButton Color="Color.Default" 
+                                       Variant="Variant.Outlined" 
+                                       StartIcon="@Icons.Material.Filled.Cancel"
+                                       OnClick="CancelEdit">
+                                Cancelar
+                            </MudButton>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+
+        <!-- List -->
+        @if (isLoading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+                <MudText Typo="Typo.subtitle1" Color="Color.Primary">Cargando productos...</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudPaper Elevation="2" Class="mt-4">
+                 <MudGrid Class="px-3 mb-2" AlignItems="AlignItems.Center">
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="searchString" Placeholder="Buscar por nombre o código..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium"></MudTextField>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int" Label="Filtrar por Categoría" @bind-Value="selectedCategoryFilter" AnchorOrigin="Origin.BottomCenter">
+                            <MudSelectItem Value="0">Todas</MudSelectItem>
+                            @foreach (var cat in Categories)
+                            {
+                                <MudSelectItem Value="@cat.Id">@cat.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+
+                <MudTable Items="Products" Hover="true" Striped="true" Elevation="0" Filter="new Func<ProductDto,bool>(FilterFunc)">
+                    <HeaderContent>
+                        <MudTh>Imagen</MudTh>
+                        <MudTh>Código</MudTh>
+                        <MudTh>Nombre</MudTh>
+                        <MudTh>Categoría</MudTh>
+                        <MudTh>Precio</MudTh>
+                        <MudTh>Stock</MudTh>
+                        <MudTh>Estado</MudTh>
+                        <MudTh Style="text-align: right;">Acciones</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Image">
+                            @if (!string.IsNullOrEmpty(context.ImageUrl))
+                            {
+                                <MudImage Src="@context.ImageUrl" Height="50" Class="rounded" ObjectFit="ObjectFit.Cover"/>
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.ImageNotSupported" Size="Size.Large" Color="Color.Default" />
+                            }
+                        </MudTd>
+                        <MudTd DataLabel="Code">@context.Code</MudTd>
+                        <MudTd DataLabel="Name">@context.Name</MudTd>
+                        <MudTd DataLabel="Category">@context.CategoryName</MudTd>
+                        <MudTd DataLabel="Price">@context.Price.ToString("C2")</MudTd>
+                        <MudTd DataLabel="Stock">
+                            <MudChip T="string" Size="Size.Small" Color="@(context.CurrentStock <= context.StockMinimum ? Color.Warning : Color.Success)">
+                                @context.CurrentStock
+                            </MudChip>
+                        </MudTd>
+                         <MudTd DataLabel="Status">
+                            @if (context.IsActive)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success">Activo</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error">Inactivo</MudChip>
+                            }
+                        </MudTd>
+                        <MudTd Style="text-align: right;">
+                             <MudTooltip Text="Ajustar Stock">
+                                <MudIconButton Size="Size.Small" 
+                                               Icon="@Icons.Material.Filled.Inventory" 
+                                               Color="Color.Info" 
+                                               OnClick="() => OpenStockAdjustment(context)" />
+                            </MudTooltip>
+                            <MudTooltip Text="Editar">
+                                <MudIconButton Size="Size.Small" 
+                                               Icon="@Icons.Material.Filled.Edit" 
+                                               Color="Color.Primary" 
+                                               OnClick="() => StartEdit(context)" />
+                            </MudTooltip>
+                            <MudTooltip Text="Eliminar">
+                                <MudIconButton Size="Size.Small" 
+                                               Icon="@Icons.Material.Filled.Delete" 
+                                               Color="Color.Error" 
+                                               OnClick="() => Delete(context)" />
+                            </MudTooltip>
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager />
+                    </PagerContent>
+                </MudTable>
+            </MudPaper>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<ProductDto> Products = new();
+    private List<CategoryDto> Categories = new();
+    private bool isLoading = true;
+    private bool showCreate = false;
+    private CreateProductDto createModel = new();
+    private ProductDto? editingProduct;
+    private string? newImageBase64;
+    private string searchString = "";
+    private int selectedCategoryFilter = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        await LoadCategories();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        var result = await ProductService.GetAllAsync();
+        if (result != null)
+        {
+            Products = result.ToList();
+        }
+        isLoading = false;
+    }
+
+    private async Task LoadCategories()
+    {
+         var result = await CategoryService.GetAllAsync();
+        if (result != null)
+        {
+            Categories = result.ToList();
+        }
+    }
+
+
+    private void ToggleCreate()
+    {
+        showCreate = !showCreate;
+        if (showCreate) CancelEdit();
+    }
+
+    private async Task UploadImage(IBrowserFile file)
+    {
+        createModel.Image = await UploadFiles.UploadImagesAsync(file);
+    }
+
+    private async Task UploadImageEdit(IBrowserFile file)
+    {
+        newImageBase64 = await UploadFiles.UploadImagesAsync(file);
+    }
+
+    private async Task HandleCreate()
+    {
+         if (createModel.CategoryId == 0)
+        {
+            Snackbar.Add("Debe seleccionar una categoría", Severity.Warning);
+            return;
+        }
+
+        var result = await ProductService.CreateAsync(createModel);
+        if (result != null)
+        {
+            showCreate = false;
+            createModel = new();
+            await LoadData();
+            Snackbar.Add("Producto creado correctamente", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Error al crear producto", Severity.Error);
+        }
+    }
+
+    private void StartEdit(ProductDto product)
+    {
+        showCreate = false;
+        newImageBase64 = null;
+        editingProduct = new ProductDto 
+        { 
+            Id = product.Id, 
+            Code = product.Code,
+            Name = product.Name, 
+            Description = product.Description,
+            Price = product.Price,
+            CurrentStock = product.CurrentStock,
+            StockMinimum = product.StockMinimum,
+            CategoryId = product.CategoryId,
+            CategoryName = product.CategoryName,
+            ImageUrl = product.ImageUrl,
+            IsActive = product.IsActive
+        };
+    }
+
+    private void CancelEdit()
+    {
+        editingProduct = null;
+        newImageBase64 = null;
+    }
+
+    private async Task HandleUpdate()
+    {
+        if (editingProduct == null) return;
+        
+        var updateDto = new EditProductDto
+        {
+            Code = editingProduct.Code,
+            Name = editingProduct.Name,
+            Description = editingProduct.Description,
+            Price = editingProduct.Price,
+            CurrentStock = editingProduct.CurrentStock,
+            StockMinimum = editingProduct.StockMinimum,
+            CategoryId = editingProduct.CategoryId,
+            IsActive = editingProduct.IsActive,
+            Image = newImageBase64 
+        };
+
+        var result = await ProductService.UpdateAsync(editingProduct.Id, updateDto);
+        if (result != null)
+        {
+            editingProduct = null;
+            newImageBase64 = null;
+            await LoadData();
+            Snackbar.Add("Producto actualizado", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Error al actualizar producto", Severity.Error);
+        }
+    }
+
+    private async Task Delete(ProductDto product)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"¿Eliminar producto {product.Name}?"))
+            return;
+
+        var result = await ProductService.DeleteAsync(product.Id);
+        if (result)
+        {
+            await LoadData();
+            Snackbar.Add("Producto eliminado", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Error al eliminar producto", Severity.Error);
+        }
+    }
+
+    private bool FilterFunc(ProductDto element)
+    {
+        if (selectedCategoryFilter != 0 && element.CategoryId != selectedCategoryFilter)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        
+        if (element.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (element.Code.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    private async Task OpenStockAdjustment(ProductDto product)
+    {
+        var parameters = new DialogParameters();
+        parameters.Add("ProductId", product.Id);
+        parameters.Add("ProductName", product.Name);
+
+        var dialog = await DialogService.ShowAsync<StockAdjustmentDialog>("Ajustar Stock", parameters);
+        var result = await dialog.Result;
+
+        if (!result!.Canceled)
+        {
+            await LoadData();
+        }
+    }
+}
+

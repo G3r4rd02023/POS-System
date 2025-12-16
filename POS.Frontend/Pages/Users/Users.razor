@@ -1,0 +1,379 @@
+@page "/users"
+
+@inject IRequestService RequestService
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudPaper Elevation="0" Class="pa-6">
+        <!-- Header con gradiente -->
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-6">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Primary" />
+                <MudText Typo="Typo.h4" Color="Color.Primary">
+                    <b>Gestión de Usuarios</b>
+                </MudText>
+            </MudStack>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       Size="Size.Large"
+                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                       OnClick="ToggleCreate">
+                Nuevo Usuario
+            </MudButton>
+        </MudStack>
+
+        <!-- Formulario de Creación con Slide -->
+        <MudCollapse Expanded="showCreate">
+            <MudPaper Elevation="4" Class="pa-4 mb-4" Style="border-left: 4px solid var(--mud-palette-primary);">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                    <MudText Typo="Typo.h6" Color="Color.Primary">
+                        <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
+                        Crear Nuevo Usuario
+                    </MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                   Color="Color.Default" 
+                                   OnClick="() => showCreate = false" />
+                </MudStack>
+                
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="createModel.Name" 
+                                      Label="Nombre completo" 
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Person" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="createModel.Email" 
+                                      Label="Correo electrónico" 
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Email" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="createModel.Username" 
+                                      Label="Nombre de usuario" 
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.AccountCircle" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="createModel.Password" 
+                                      Label="Contraseña" 
+                                      InputType="InputType.Password"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Lock" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect @bind-Value="createModel.Role" 
+                                   Label="Rol del usuario" 
+                                   Variant="Variant.Outlined"
+                                   AnchorOrigin="Origin.BottomCenter">
+                            @foreach (var r in Enum.GetValues<Role>())
+                            {
+                                <MudSelectItem Value="@r">
+                                    <MudChip T="string" Size="Size.Small" Color="GetRoleColor(r)">@r</MudChip>
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" Class="d-flex align-center">
+                        <MudSwitch T="bool" @bind-Checked="createModel.IsActive" 
+                                   Color="Color.Success" 
+                                   Label="Usuario activo"
+                                   ThumbIcon="@(createModel.IsActive ? Icons.Material.Filled.Check : Icons.Material.Filled.Close)" />
+                    </MudItem>
+                    <MudItem xs="12" Class="mt-2">
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Color="Color.Success" 
+                                       Variant="Variant.Filled" 
+                                       StartIcon="@Icons.Material.Filled.Save"
+                                       OnClick="HandleCreate">
+                                Crear Usuario
+                            </MudButton>
+                            <MudButton Color="Color.Default" 
+                                       Variant="Variant.Outlined" 
+                                       StartIcon="@Icons.Material.Filled.Cancel"
+                                       OnClick="() => showCreate = false">
+                                Cancelar
+                            </MudButton>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudCollapse>
+
+        <!-- Tabla de Usuarios -->
+        @if (isLoading)
+        {
+            <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+                <MudText Typo="Typo.subtitle1" Color="Color.Primary">Cargando usuarios...</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudPaper Elevation="2" Class="mt-4">
+                <MudTable Items="users" 
+                          Hover="true" 
+                          Dense="false" 
+                          Striped="true"
+                          Elevation="0"
+                          Class="rounded-lg">
+                    <HeaderContent>
+                        <MudTh><MudText Typo="Typo.subtitle2"><b>ID</b></MudText></MudTh>
+                        <MudTh><MudText Typo="Typo.subtitle2"><b>Nombre</b></MudText></MudTh>
+                        <MudTh><MudText Typo="Typo.subtitle2"><b>Email</b></MudText></MudTh>
+                        <MudTh><MudText Typo="Typo.subtitle2"><b>Usuario</b></MudText></MudTh>
+                        <MudTh><MudText Typo="Typo.subtitle2"><b>Rol</b></MudText></MudTh>
+                        <MudTh><MudText Typo="Typo.subtitle2"><b>Estado</b></MudText></MudTh>
+                        <MudTh Style="text-align: right;"><MudText Typo="Typo.subtitle2"><b>Acciones</b></MudText></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Id">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">#@context.Id</MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Nombre">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudAvatar Color="Color.Primary" Size="Size.Small">
+                                    @context.Name?.Substring(0, 1).ToUpper()
+                                </MudAvatar>
+                                <MudText>@context.Name</MudText>
+                            </MudStack>
+                        </MudTd>
+                        <MudTd DataLabel="Email">
+                            <MudText Color="Color.Secondary">@context.Email</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Username">
+                            <MudText>@context.Username</MudText>
+                        </MudTd>
+                        <MudTd DataLabel="Role">
+                            <MudChip T="string" Size="Size.Small" Color="GetRoleColor(context.Role)">
+                                @context.Role
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Activo">
+                            @if (context.IsActive)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">
+                                    Activo
+                                </MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Cancel">
+                                    Inactivo
+                                </MudChip>
+                            }
+                        </MudTd>
+                        <MudTd Style="text-align: right;">
+                            <MudTooltip Text="Editar usuario">
+                                <MudIconButton Size="Size.Small" 
+                                               Icon="@Icons.Material.Filled.Edit" 
+                                               Color="Color.Primary" 
+                                               OnClick="() => StartEdit(context)" />
+                            </MudTooltip>
+                            <MudTooltip Text="Eliminar usuario">
+                                <MudIconButton Size="Size.Small" 
+                                               Icon="@Icons.Material.Filled.Delete" 
+                                               Color="Color.Error" 
+                                               OnClick="() => DeleteUser(context.Id)" />
+                            </MudTooltip>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        }
+
+        <!-- Formulario de Edición con Dialog Style -->
+        @if (editingUser != null)
+        {
+            <MudPaper Elevation="8" Class="pa-4 mt-4" Style="border-left: 4px solid var(--mud-palette-info);">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                    <MudText Typo="Typo.h6" Color="Color.Info">
+                        <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-2" />
+                        Editar Usuario - @editingUser.Name
+                    </MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                   Color="Color.Default" 
+                                   OnClick="CancelEdit" />
+                </MudStack>
+                
+                <MudGrid>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="editingUser.Name" 
+                                      Label="Nombre completo" 
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Person" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="editingUser.Email" 
+                                      Label="Correo electrónico" 
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Email" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="editingUser.Username" 
+                                      Label="Nombre de usuario" 
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.AccountCircle" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect @bind-Value="editingUser.Role" 
+                                   Label="Rol del usuario" 
+                                   Variant="Variant.Outlined">
+                            @foreach (var r in Enum.GetValues<Role>())
+                            {
+                                <MudSelectItem Value="@r">
+                                    <MudChip T="string" Size="Size.Small" Color="GetRoleColor(r)">@r</MudChip>
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" Class="d-flex align-center">
+                        <MudSwitch T="bool" @bind-Checked="editingUser.IsActive" 
+                                   Color="Color.Success" 
+                                   Label="Usuario activo"
+                                   ThumbIcon="@(editingUser.IsActive ? Icons.Material.Filled.Check : Icons.Material.Filled.Close)" />
+                    </MudItem>
+                    <MudItem xs="12" Class="mt-2">
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Color="Color.Info" 
+                                       Variant="Variant.Filled" 
+                                       StartIcon="@Icons.Material.Filled.Save"
+                                       OnClick="HandleUpdate">
+                                Guardar Cambios
+                            </MudButton>
+                            <MudButton Color="Color.Default" 
+                                       Variant="Variant.Outlined" 
+                                       StartIcon="@Icons.Material.Filled.Cancel"
+                                       OnClick="CancelEdit">
+                                Cancelar
+                            </MudButton>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private List<UserResponseDto> users = new();
+    private bool isLoading = true;
+    private bool showCreate = false;
+    private CreateUserDto createModel = new CreateUserDto();
+    private UserResponseDto? editingUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        isLoading = true;
+        var url = "/api/users";
+        users = await RequestService.GetAsync<List<UserResponseDto>>(url);
+        isLoading = false;
+    }
+
+    private void ToggleCreate()
+    {
+        showCreate = !showCreate;
+    }
+
+    private async Task HandleCreate()
+    {
+        var url = "/api/users";
+        var created = await RequestService.PostAsync<CreateUserDto>(url,createModel);
+        if (created != null)
+        {
+            showCreate = false;
+            createModel = new CreateUserDto();
+            await LoadUsersAsync();
+            Snackbar.Add("Usuario creado correctamente", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Error al crear el usuario", Severity.Error);
+        }
+    }
+
+    private void StartEdit(UserResponseDto u)
+    {
+        editingUser = new UserResponseDto
+        {
+            Id = u.Id,
+            Name = u.Name,
+            Email = u.Email,
+            Username = u.Username,
+            Role = u.Role,
+            IsActive = u.IsActive
+        };
+    }
+
+    private void CancelEdit()
+    {
+        editingUser = null;
+    }
+
+    private async Task HandleUpdate()
+    {
+        if (editingUser == null) return;
+        var url = $"api/users/{editingUser.Id}";
+        var updated = await RequestService.PutAsync(url, editingUser);
+        if (updated != null)
+        {
+            editingUser = null;
+            await LoadUsersAsync();
+            Snackbar.Add("Usuario actualizado", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Error al actualizar usuario", Severity.Error);
+        }
+    }
+
+    private async Task DeleteUser(int id)
+    {
+        if (!await JSRuntimeInvokeConfirm($"Eliminar usuario #{id}?"))
+            return;
+
+        var url = $"api/users/{id}";
+
+        try
+        {
+            await RequestService.DeleteAsync(url);
+            await LoadUsersAsync();
+            Snackbar.Add("Usuario eliminado", Severity.Success);
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("No se pudo eliminar el usuario", Severity.Error);
+        }
+    }
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = default!;
+
+    private async Task<bool> JSRuntimeInvokeConfirm(string message)
+    {
+        return await JSRuntime.InvokeAsync<bool>("confirm", message);
+    }
+
+    // Método helper para asignar colores a roles
+    private Color GetRoleColor(Role role)
+    {
+        return role switch
+        {
+            Role.Cajero => Color.Error,
+            Role.Administrador => Color.Warning,           
+            _ => Color.Default
+        };
+    }
+}

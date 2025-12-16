@@ -1,0 +1,47 @@
+﻿@using POS.Frontend.Pages.Account
+@inherits LayoutComponentBase
+
+<MudThemeProvider @ref="_mudThemeProvider" @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Color="Color.Primary ">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        POS System
+        <MudSpacer />
+    <MudText Typo="Typo.body1" Style="color: white; margin-right: 16px;">            
+        <AuthLinks/>
+    </MudText>  
+    </MudAppBar>
+    <MudDrawer @bind-Open="@_drawerOpen">
+        <NavMenu/>
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Medium">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+
+@code {
+    bool _drawerOpen = true;
+    private bool _isDarkMode;
+    private MudThemeProvider? _mudThemeProvider;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isDarkMode = await _mudThemeProvider!.GetSystemDarkModeAsync();
+            StateHasChanged();
+        }
+    }
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}

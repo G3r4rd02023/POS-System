@@ -1,0 +1,45 @@
+﻿@inject POS.Frontend.Services.AuthService AuthService
+@inject POS.Frontend.Services.ILoginService LoginManager
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDialogService DialogService
+@using POS.Frontend.Pages.CashClosing
+
+<AuthorizeView Roles="Administrador">
+    <Authorized>
+        <MudNavMenu>
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+            <MudNavLink Href="/categories" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Category">Categorías</MudNavLink>
+            <MudNavLink Href="/products" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Inventory">Productos</MudNavLink>
+            <MudNavLink Href="/sales" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.PointOfSale">Punto de Venta</MudNavLink>
+            
+            <MudNavGroup Title="Administración" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="true">
+                <MudNavLink OnClick="OpenCashClosing" Icon="@Icons.Material.Filled.Summarize">Corte de Caja</MudNavLink>
+                <MudNavLink Href="/reports" Icon="@Icons.Material.Filled.Assessment">Reportes</MudNavLink>
+            </MudNavGroup>
+        </MudNavMenu>
+    </Authorized>
+</AuthorizeView>
+
+<AuthorizeView Roles="Cajero">
+    <Authorized>
+        <MudNavMenu>  
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+            <MudNavLink OnClick="OpenCashClosing" Icon="@Icons.Material.Filled.Summarize">Corte de Caja</MudNavLink>
+            <MudNavLink Href="/sales" Match="NavLinkMatch.Prefix">Ventas</MudNavLink>            
+            <MudSpacer />
+        </MudNavMenu>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private void OpenCashClosing()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        DialogService.ShowAsync<CashClosingDialog>("Corte de Caja", options);
+    }
+}
+
+
+
+

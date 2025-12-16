@@ -1,0 +1,243 @@
+﻿@page "/"
+@using POS.Shared.DTOs.Dashboard
+@using POS.Frontend.Services
+@inject IDashboardService DashboardService
+@inject NavigationManager NavigationManager
+@inject AuthService AuthService
+
+<PageTitle>Panel de Control</PageTitle>
+
+@if(CurrentRole == "Cajero")
+{
+    NavigationManager.NavigateTo("/sales");
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+        <!-- Header -->
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h4" Style="font-weight: bold;">Panel de Control</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Resumen de operaciones y métricas clave.</MudText>
+            </MudStack>
+            <MudChip T="string" Icon="@Icons.Material.Filled.CalendarToday" Color="Color.Surface">@DateTime.Now.ToString("dd MMMM, yyyy")</MudChip>
+        </MudStack>
+
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <!-- KPI Cards -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="2" Class="pa-4 d-flex flex-column gap-2">
+                        <MudText Typo="Typo.caption" Style="text-transform: uppercase;">VENTAS DE HOY</MudText>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.h4" Style="font-weight: bold;">@Data?.TotalSalesToday.ToString("C2")</MudText>
+                            <MudIcon Icon="@Icons.Material.Filled.PointOfSale" Size="Size.Large" Color="Color.Primary" Style="opacity: 0.2" />
+                        </MudStack>
+                        @* Mock trend *@
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.TrendingUp"> +12% vs ayer</MudChip>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="2" Class="pa-4 d-flex flex-column gap-2">
+                        <MudText Typo="Typo.caption" Style="text-transform: uppercase;">TRANSACCIONES</MudText>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.h4" Style="font-weight: bold;">@Data?.TransactionsToday</MudText>
+                            <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Color="Color.Info" Style="opacity: 0.2" />
+                        </MudStack>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.TrendingUp"> +5%</MudChip>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="2" Class="pa-4 d-flex flex-column gap-2">
+                        <MudText Typo="Typo.caption" Style="text-transform: uppercase;">TICKET PROMEDIO</MudText>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.h4" Style="font-weight: bold;">@Data?.AverageTicketToday.ToString("C2")</MudText>
+                            <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Warning" Style="opacity: 0.2" />
+                        </MudStack>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.TrendingDown"> -2%</MudChip>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="2" Class="pa-4 d-flex flex-column gap-2" Style="@(Data?.LowStockCount > 0 ? "border-right: 4px solid var(--mud-palette-warning);" : "")">
+                        <MudText Typo="Typo.caption" Style="text-transform: uppercase;">PRODUCTOS BAJOS</MudText>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.h4" Style="font-weight: bold;">@Data?.LowStockCount</MudText>
+                            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Color="Color.Warning" Style="opacity: 0.2" />
+                        </MudStack>
+                        @if (Data?.LowStockCount > 0)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Warning">Atención requerida</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Todo en orden</MudChip>
+                        }
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Quick Access -->
+            <MudText Typo="Typo.h6" Class="mb-2">Accesos Rápidos</MudText>
+            <MudGrid Class="mb-4">
+                <MudItem xs="6" sm="3">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="py-4" StartIcon="@Icons.Material.Filled.ShoppingCart" OnClick="@(() => NavigationManager.NavigateTo("/sales"))">Nueva Venta</MudButton>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true" Class="py-4" StartIcon="@Icons.Material.Filled.AddBox" OnClick="@(() => NavigationManager.NavigateTo("/products"))">Añadir Producto</MudButton>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true" Class="py-4" StartIcon="@Icons.Material.Filled.Summarize" OnClick="OpenCashClosing">Cierre de Caja</MudButton>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true" Class="py-4" StartIcon="@Icons.Material.Filled.Assessment" OnClick="@(() => NavigationManager.NavigateTo("/reports"))">Ver Reportes</MudButton>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Main Content -->
+            <MudGrid>
+                <!-- Chart Section -->
+                <MudItem xs="12" md="8">
+                    <MudPaper Elevation="2" Class="pa-4" Style="height: 100%;">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-4">
+                            <MudStack Spacing="0">
+                                <MudText Typo="Typo.h6">Rendimiento de Ventas (Hoy)</MudText>
+                                <MudText Typo="Typo.caption">Volumen de ventas por hora</MudText>
+                            </MudStack>
+                            @* Toggle mock *@
+                            <MudButtonGroup Size="Size.Small" Variant="Variant.Outlined">
+                                <MudButton Variant="Variant.Filled" Color="Color.Default">Hoy</MudButton>
+                                <MudButton>Semana</MudButton>
+                            </MudButtonGroup>
+                        </MudStack>
+
+                        @if (Data != null && Data.SalesByHour.Any())
+                        {
+                            <MudChart ChartType="ChartType.Bar" ChartSeries="@Series" XAxisLabels="@XAxisLabels" Width="100%" Height="300px"></MudChart>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body1" Align="Align.Center" Class="py-8">No hay datos de ventas hoy.</MudText>
+                        }
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Side Lists -->
+                <MudItem xs="12" md="4">
+                    <MudStack Spacing="4">
+                        <!-- Alerts -->
+                        <MudPaper Elevation="2" Class="pa-0">
+                            <MudToolBar Dense="true" Class="mud-theme-warning-hover">
+                                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-2" />
+                                <MudText Typo="Typo.subtitle1"><b>Alerta de Inventario</b></MudText>
+                                <MudSpacer />
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning">@Data?.LowStockCount items</MudChip>
+                            </MudToolBar>
+                            <MudList T="string" Dense="true" Clickable="true">
+                                @foreach (var item in Data?.LowStockProducts ?? new())
+                                {
+                                    <MudListItem T="string">
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                            <MudStack Spacing="0">
+                                                <MudText Typo="Typo.body2" Style="font-weight: bold;">@item.Name</MudText>
+                                                <MudText Typo="Typo.caption">@item.CategoryName</MudText>
+                                            </MudStack>
+                                            <MudStack Spacing="0" AlignItems="AlignItems.End">
+                                                <MudText Typo="Typo.body2" Color="Color.Error" Style="font-weight: bold;">@item.CurrentStock un.</MudText>
+                                                <MudLink Typo="Typo.caption" Color="Color.Primary" Href="/products">Reponer</MudLink>
+                                            </MudStack>
+                                        </MudStack>
+                                    </MudListItem>
+                                    <MudDivider />
+                                }
+                            </MudList>
+                        </MudPaper>
+
+                        <!-- Best Sellers -->
+                        <MudPaper Elevation="2" Class="pa-4">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-2">
+                                <MudText Typo="Typo.h6">Más Vendidos</MudText>
+                                <MudLink Href="/reports">Ver todos</MudLink>
+                            </MudStack>
+                            <MudList T="string" Dense="true">
+                                @foreach (var item in Data?.TopSellingProducts ?? new())
+                                {
+                                    <MudListItem T="string" Class="px-0">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudAvatar>
+                                                <MudImage Src="@(string.IsNullOrEmpty(item.ImageUrl) ? "https://via.placeholder.com/50" : item.ImageUrl)" Width="40" Height="40" />
+                                            </MudAvatar>
+                                            <MudStack Spacing="0" Class="flex-grow-1">
+                                                <MudText Typo="Typo.body2" Style="font-weight: bold;">@item.Name</MudText>
+                                                <MudText Typo="Typo.caption">$@item.Price • @item.CategoryName</MudText>
+                                            </MudStack>
+                                            @* Would be nice to show Quantity sold *@
+                                        </MudStack>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        </MudPaper>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+        }
+    </MudContainer>
+
+}
+@inject IDialogService DialogService
+@using POS.Frontend.Pages.CashClosing
+
+@code {
+    private DashboardDataDto? Data;
+    private bool isLoading = true;
+    private string? CurrentRole;
+
+    private List<ChartSeries> Series = new();
+    private string[] XAxisLabels = { };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        CurrentRole = await AuthService.GetUserRoleAsync();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            Data = await DashboardService.GetDataAsync();
+            if (Data != null)
+            {
+                // Init Chart
+                // Needs ordered data. Assuming Backend provides or we sort.
+                var sortedSales = Data.SalesByHour.ToList(); // they were ordered in backend
+                
+                Series = new List<ChartSeries>()
+                {
+                    new ChartSeries() { Name = "Ventas ($)", Data = sortedSales.Select(x => (double)x.TotalAmount).ToArray() }
+                };
+                
+                XAxisLabels = sortedSales.Select(x => x.Hour).ToArray();
+            }
+        }
+        catch (Exception)
+        {
+            // Handle error, maybe show empty state
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    // Reuse logic from NavMenu for Quick Action
+    private void OpenCashClosing()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        DialogService.ShowAsync<CashClosingDialog>("Corte de Caja", options);
+    }
+}

@@ -1,0 +1,322 @@
+@page "/sales"
+@using POS.Shared.DTOs.Product
+@using POS.Shared.DTOs.Category
+@using POS.Shared.DTOs.Sale
+@using POS.Shared.Enums
+@using POS.Frontend.Services
+@inject IProductService ProductService
+@inject ICategoryService CategoryService
+@inject ISaleService SaleService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4" Style="height: 90vh;">
+    <MudGrid Style="height: 100%;">
+        <!-- Left Column: Product Selection -->
+        <MudItem xs="12" md="8" Style="height: 100%; display: flex; flex-direction: column;">
+            
+            <!-- Search and Filter Bar -->
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudGrid AlignItems="AlignItems.Center">
+                    <MudItem xs="12" sm="8">
+                        <MudTextField @bind-Value="searchString" Placeholder="Buscar producto o escanear código (F2)" 
+                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" 
+                                      Variant="Variant.Outlined" TextChanged="OnSearchChanged" Immediate="true"/>
+                    </MudItem>
+                     <MudItem xs="12" sm="4">
+                        <MudSelect T="int" Label="Categoría" @bind-Value="selectedCategoryId" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter" SelectedValuesChanged="OnCategoryChanged">
+                            <MudSelectItem Value="0">Todos</MudSelectItem>
+                            @foreach (var cat in Categories)
+                            {
+                                <MudSelectItem Value="@cat.Id">@cat.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <!-- Product Grid -->
+             <MudPaper Elevation="2" Class="pa-4 flex-grow-1" Style="overflow-y: auto;">
+                 @if (isLoading)
+                {
+                    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="py-8">
+                        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                    </MudStack>
+                }
+                else
+                {
+                    <MudGrid>
+                        @foreach (var product in FilteredProducts)
+                        {
+                            <MudItem xs="6" sm="4" md="3">
+                                <MudCard Class="cursor-pointer hover-elevation" @onclick="() => AddToCart(product)" Elevation="2">
+                                    <MudCardMedia Image="@(string.IsNullOrEmpty(product.ImageUrl) ? "https://via.placeholder.com/150" : product.ImageUrl)" Height="140" />
+                                    <MudCardContent Class="pa-3">
+                                        <MudText Typo="Typo.subtitle2" Style="font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@product.Name</MudText>
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-2">
+                                             <MudText Typo="Typo.h6" Color="Color.Primary">@product.Price.ToString("C2")</MudText>
+                                             @if(product.CurrentStock <= product.StockMinimum)
+                                             {
+                                                 <MudChip T="string" Size="Size.Small" Color="Color.Error">Low</MudChip>
+                                             }
+                                        </MudStack>
+                                    </MudCardContent>
+                                </MudCard>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+             </MudPaper>
+        </MudItem>
+
+        <!-- Right Column: Ticket / Cart -->
+        <MudItem xs="12" md="4" Style="height: 100%; display: flex; flex-direction: column;">
+            <MudPaper Elevation="4" Class="pa-4 flex-grow-1 d-flex flex-column" Style="height: 100%;">
+                
+                <!-- Ticket Header -->
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4 pb-2 border-b-2">
+                    <MudText Typo="Typo.h5"><b>Ticket #@nextTicketNumber</b></MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" OnClick="ClearCart">Limpiar</MudButton>
+                </MudStack>
+
+                <!-- Cart Items List -->
+                <MudList T="string" Class="flex-grow-1" Style="overflow-y: auto;">
+                    @foreach (var item in CartItems)
+                    {
+                        <MudListItem T="string" Dense="true" Class="px-0">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">                                 
+                                 <MudAvatar>
+                                    <MudImage Src="@(string.IsNullOrEmpty(item.ImageUrl) ? "https://via.placeholder.com/50" : item.ImageUrl)" Width="40" Height="40" />
+                                 </MudAvatar>
+                                 <MudStack Spacing="0" Style="width: 100%;">
+                                     <MudText Typo="Typo.body1" Style="font-weight: 500;">@item.ProductName</MudText>
+                                     <MudText Typo="Typo.caption">@item.UnitPrice.ToString("C2") / u</MudText>
+                                 </MudStack>
+                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
+                                     <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small" OnClick="() => DecreaseQty(item)"/>
+                                     <MudText Typo="Typo.body1" Class="mx-2"><b>@item.Quantity</b></MudText>
+                                     <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" OnClick="() => IncreaseQty(item)"/>
+                                 </MudStack>
+                                 <MudText Typo="Typo.body1" Style="font-weight: bold; min-width: 60px; text-align: right;">@item.TotalPrice.ToString("C2")</MudText>
+                            </MudStack>
+                        </MudListItem>
+                         <MudDivider />
+                    }
+                </MudList>
+
+                <!-- Totals Section -->
+                <MudPaper Class="mt-auto pt-4 border-t-2" Elevation="0">
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText>Subtotal (@CartItems.Sum(i => i.Quantity) artículos)</MudText>
+                            <MudText>@SubTotal.ToString("C2")</MudText>
+                        </MudStack>
+                         <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText>Descuento</MudText>
+                            <MudText Color="Color.Success">-$0.00</MudText>
+                        </MudStack>
+                        <MudDivider />
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-2">
+                            <MudText Typo="Typo.h4"><b>Total a Pagar</b></MudText>
+                            <MudText Typo="Typo.h4"><b>@Total.ToString("C2")</b></MudText>
+                        </MudStack>
+                    </MudStack>
+                    
+                    <MudSelect T="PaymentMethod" Label="Método de Pago" @bind-Value="selectedPaymentMethod" Variant="Variant.Outlined" Class="mt-4" AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem Value="PaymentMethod.Efectivo">Efectivo</MudSelectItem>
+                        <MudSelectItem Value="PaymentMethod.Tarjeta">Tarjeta</MudSelectItem>
+                        <MudSelectItem Value="PaymentMethod.Transferencia">Transferencia</MudSelectItem>
+                    </MudSelect>
+
+                    <MudStack Row="true" Class="mt-4" Spacing="2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true" OnClick="ClearCart">Cancelar</MudButton>
+                         <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large" 
+                                   StartIcon="@Icons.Material.Filled.Payment" OnClick="ProcessSale" Disabled="@(!CartItems.Any())">
+                            Cobrar
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+<style>
+    .hover-elevation:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
+    }
+</style>
+
+@code {
+    private List<ProductDto> Products = new();
+    private List<ProductDto> FilteredProducts = new();
+    private List<CategoryDto> Categories = new();
+    private List<CartItem> CartItems = new();
+    
+    private bool isLoading = true;
+    private string searchString = "";
+    private int selectedCategoryId = 0;
+    private int currentTicket = 1001; // This would normally come from a service
+    private int nextTicketNumber; // Dummy number
+    private PaymentMethod selectedPaymentMethod = PaymentMethod.Efectivo;
+
+    private decimal SubTotal => CartItems.Sum(x => x.TotalPrice);
+    private decimal Total => SubTotal; // Tax logic can be added
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        var productsResult = await ProductService.GetAllAsync();
+        var categoriesResult = await CategoryService.GetAllAsync();
+        
+        if (productsResult != null) Products = productsResult.ToList();
+        if (categoriesResult != null) Categories = categoriesResult.ToList();
+        
+        FilterProducts();
+        isLoading = false;
+    }
+
+    private void OnSearchChanged(string text)
+    {
+        searchString = text;
+        FilterProducts();
+    }
+
+     private void OnCategoryChanged(IEnumerable<int> values)
+    {
+        // MudSelect MultiSelection logic compatibility if needed, but here simple int binding
+        FilterProducts();
+    }
+
+    private void FilterProducts()
+    {
+        var query = Products.AsQueryable();
+
+        if (selectedCategoryId != 0)
+        {
+            query = query.Where(p => p.CategoryId == selectedCategoryId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchString))
+        {
+            query = query.Where(p => p.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) 
+                                  || p.Code.Contains(searchString, StringComparison.OrdinalIgnoreCase));
+        }
+
+        FilteredProducts = query.ToList();
+    }
+
+    private void AddToCart(ProductDto product)
+    {
+        if (product.CurrentStock <= 0)
+        {
+            Snackbar.Add("Producto sin stock", Severity.Warning);
+            return;
+        }
+
+        var existingItem = CartItems.FirstOrDefault(x => x.ProductId == product.Id);
+        if (existingItem != null)
+        {
+            if (existingItem.Quantity >= product.CurrentStock)
+            {
+                 Snackbar.Add("Stock insuficiente para agregar más", Severity.Warning);
+                 return;
+            }
+            existingItem.Quantity++;
+        }
+        else
+        {
+            CartItems.Add(new CartItem
+            {
+                ProductId = product.Id,
+                ProductName = product.Name,
+                UnitPrice = product.Price,
+                Quantity = 1,
+                ImageUrl = product.ImageUrl,
+                Stock = product.CurrentStock
+            });
+        }
+    }
+
+    private void IncreaseQty(CartItem item)
+    {
+        if (item.Quantity < item.Stock)
+        {
+             item.Quantity++;
+        }
+        else
+        {
+            Snackbar.Add("Alcanzado límite de stock", Severity.Warning);
+        }
+    }
+
+    private void DecreaseQty(CartItem item)
+    {
+        if (item.Quantity > 1)
+        {
+            item.Quantity--;
+        }
+        else
+        {
+            CartItems.Remove(item);
+        }
+    }
+
+    private void ClearCart()
+    {
+        CartItems.Clear();
+    }
+
+    private async Task ProcessSale()
+    {
+        // 1. Get Current User ID (Mock for now, or get from AuthState)
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        // In a real app we parse claims. For now using a random user ID or 1 if testing with seeded data.
+        int userId = 1; 
+
+        var createSaleDto = new CreateSaleDto
+        {
+            UserId = userId,
+            PaymentMethod = selectedPaymentMethod,
+            SaleDetails = CartItems.Select(x => new SaleDetailDto 
+            {
+                ProductId = x.ProductId,
+                Quantity = x.Quantity
+            }).ToList()
+        };
+
+        var result = await SaleService.CreateSaleAsync(createSaleDto);
+        if (result != null)
+        {
+            Snackbar.Add("Venta realizada con éxito!", Severity.Success);
+            ClearCart();
+            nextTicketNumber++; // Increment ticket number
+            await LoadData(); // Refresh stock
+        }
+        else
+        {
+            Snackbar.Add("Error al procesar la venta", Severity.Error);
+        }
+    }
+
+    public class CartItem
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public decimal UnitPrice { get; set; }
+        public int Quantity { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;
+        public int Stock { get; set; }
+        public decimal TotalPrice => UnitPrice * Quantity;
+    }
+}

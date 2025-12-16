@@ -1,0 +1,99 @@
+@page "/login"
+
+@inject AuthService AuthService
+@inject ILoginService LoginManager
+@inject NavigationManager NavigationManager
+@inject HttpClient HttpClient
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="mt-10">
+    <MudPaper Class="pa-6 rounded-lg" Elevation="25">
+        <MudIcon Icon="@Icons.Material.Filled.Sailing"
+                 Color="Color.Info"
+                 Size="Size.Large"
+                 Class="mx-auto d-block mb-2" />
+        <MudText Typo="Typo.h4" Color="Color.Inherit" Class="text-center mb-6">POS System</MudText>
+        <MudText Typo="Typo.h6" Class="text-center mb-6">Iniciar Sesión</MudText>
+        <MudTextField @bind-Value="model.Username" Label="Usuario" Variant="Variant.Outlined"
+                      FullWidth="true" Margin="Margin.Dense" Required="true"
+                      HelperText="Por favor, ingresa tu usuario." />
+
+        <MudTextField @bind-Value="model.Password" Label="Contraseña" Variant="Variant.Outlined"
+                      FullWidth="true" Margin="Margin.Dense" InputType="@PasswordInput"
+                      Required="true" HelperText="Por favor, ingresa tu contraseña."
+                      Class="mt-4" Adornment="Adornment.End" AdornmentIcon="@PasswordInputIcon"
+                      OnAdornmentClick="ButtonTestclick" AdornmentAriaLabel="Show Password" />
+
+        <MudButton Variant="Variant.Filled" Color="Color.Info" Class="mt-6 w-100"
+                   OnClick="HandleLogin">Iniciar Sesión</MudButton>
+
+        <MudText Class="text-center mt-4">
+            ¿No tienes cuenta? <MudLink Href="/register" Color="Color.Info">Regístrate aquí</MudLink>
+        </MudText>
+        <MudText Class="text-center mt-4">
+            ¿Olvidaste tu contraseña? <MudLink Href="/resetPassword" Color="Color.Info">Recuperala aquí</MudLink>
+        </MudText>
+    </MudPaper>
+</MudContainer>
+
+
+
+@code {
+    private readonly AuthRequestDto model = new();
+    
+    public string Password { get; set; } = string.Empty;
+
+    private bool isShow;
+    private InputType PasswordInput = InputType.Password;
+    private string PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+
+    protected override void OnInitialized()
+    {
+        Password = model.Password;
+    }
+
+    private async Task HandleLogin()
+    {
+        try
+        {
+            var url = "api/Auth/login";
+            var response = await HttpClient.PostAsJsonAsync(url, model);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var loginResponse = JsonSerializer.Deserialize<AuthResponseDto>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (loginResponse != null && loginResponse.IsAuthenticated)
+                {
+                    await ((AuthenticationProviderJWT)AuthenticationStateProvider).Login(loginResponse.Token);
+                    NavigationManager.NavigateTo("/");
+                }
+            }
+            else
+            {
+                Snackbar.Add("Credenciales inválidas. Inténtalo de nuevo.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al iniciar sesión: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void ButtonTestclick()
+    {
+        if (isShow)
+        {
+            isShow = false;
+            PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+            PasswordInput = InputType.Password;
+        }
+        else
+        {
+            isShow = true;
+            PasswordInputIcon = Icons.Material.Filled.Visibility;
+            PasswordInput = InputType.Text;
+        }
+    }
+}

@@ -1,0 +1,107 @@
+@page "/reports"
+@using POS.Shared.DTOs.Sale
+@using POS.Shared.Enums
+@using POS.Frontend.Services
+@inject ISaleService SaleService
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h5" Class="mb-4">Reporte de Ventas</MudText>
+
+    <MudPaper Class="pa-4 mb-4" Elevation="3">
+        <MudGrid AlignItems="AlignItems.Center">
+            <MudItem xs="12" sm="3">
+                <MudDatePicker Label="Fecha Inicio" @bind-Date="startDate" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudDatePicker Label="Fecha Fin" @bind-Date="endDate" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                 <MudSelect T="PaymentMethod?" Label="Método de Pago" @bind-Value="paymentMethod" Clearable="true">
+                    <MudSelectItem T="PaymentMethod?" Value="null">Todos</MudSelectItem>
+                    <MudSelectItem T="PaymentMethod?" Value="PaymentMethod.Efectivo">Efectivo</MudSelectItem>
+                    <MudSelectItem T="PaymentMethod?" Value="PaymentMethod.Tarjeta">Tarjeta</MudSelectItem>
+                    <MudSelectItem T="PaymentMethod?" Value="PaymentMethod.Transferencia">Transferencia</MudSelectItem>
+                 </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadReport" FullWidth="true" StartIcon="@Icons.Material.Filled.FilterAlt">Filtrar</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="3">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2">Total Ventas</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Success">@Sales.Sum(x => x.TotalAmount).ToString("C2")</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+         <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="3">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2">Transacciones</MudText>
+                    <MudText Typo="Typo.h5">@Sales.Count</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudTable Items="@Sales" Hover="true" Striped="true" Loading="@isLoading" Elevation="3">
+        <HeaderContent>
+            <MudTh>ID</MudTh>
+            <MudTh>Fecha</MudTh>
+            <MudTh>Usuario</MudTh>
+              @* <MudTh>Método Pago</MudTh> *@ 
+            <MudTh Style="text-align:right">Total</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="ID">@context.Id</MudTd>
+            <MudTd DataLabel="Fecha">@context.SaleDate.ToString("g")</MudTd>
+            <MudTd DataLabel="Usuario">@context.UserName</MudTd>
+             @* <MudTd DataLabel="Método">@context.PaymentMethod</MudTd> Pending in SaleDto if we want to show it *@
+            <MudTd DataLabel="Total" Style="text-align:right">@context.TotalAmount.ToString("C2")</MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+
+</MudContainer>
+
+@code {
+    private DateTime? startDate = DateTime.Today;
+    private DateTime? endDate = DateTime.Today;
+    private PaymentMethod? paymentMethod;
+    private bool isLoading = false;
+    private List<SaleDto> Sales = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReport();
+    }
+
+    private async Task LoadReport()
+    {
+        isLoading = true;
+        try
+        {
+            var filter = new SaleFilterDto
+            {
+                StartDate = startDate,
+                EndDate = endDate?.AddDays(1).AddTicks(-1), // End of day
+                PaymentMethod = paymentMethod
+            };
+
+            var result = await SaleService.GetReportAsync(filter);
+            Sales = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error al cargar reporte: {ex.Message}", Severity.Error);
+        }
+        isLoading = false;
+    }
+}
